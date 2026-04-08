@@ -15,8 +15,13 @@ saztool normalize <file.saz> [-out output_dir]
 ```
 
 Parameters:
-- `<file.saz>`: input SAZ archive or Fiddler-exported archive file
-- `-out`, `--out`: output directory; default is `<input>.norm`
+- `<file.saz>`
+  - required
+  - input SAZ archive or Fiddler-exported archive file
+- `-out`, `--out`
+  - optional
+  - output directory
+  - default: `<input>.norm`
 
 Notes:
 - `normalize file.saz -out outdir` and `normalize -out outdir file.saz` are both supported
@@ -34,9 +39,16 @@ saztool show <bundle_dir> <session-id> [-body-preview N]
 ```
 
 Parameters:
-- `<bundle_dir>`: normalized bundle directory
-- `<session-id>`: Fiddler session id to inspect
-- `-body-preview`: max preview characters for decoded textual body
+- `<bundle_dir>`
+  - required
+  - normalized bundle directory
+- `<session-id>`
+  - required
+  - Fiddler session id to inspect
+- `--body-preview N`
+  - optional
+  - default: `600`
+  - max preview characters for decoded textual body
 
 Displays:
 - sessionId / ordinal / timelineOrdinal when available
@@ -59,17 +71,27 @@ saztool search <bundle_dir> <query> [options]
 
 Options:
 - `--in body|meta|request|response|all`
+  - optional
   - limit search scope
   - default when omitted: `body + meta`
+  - comma-separated subsets are allowed, for example `request,response`
 - `--before-id N`
+  - optional
   - only search sessions with `sessionId < N`
 - `--after-id N`
+  - optional
   - only search sessions with `sessionId > N`
 - `-C N`, `--context N`
+  - optional
+  - default: `0`
   - show N surrounding lines for each textual match
 - `--body-preview N`
+  - optional
+  - default: `160`
   - max preview characters used in summary preview
 - `--output plain|grep|json`
+  - optional
+  - default: `plain`
   - choose display format
   - `plain`: rich human-readable default
   - `grep`: compact grep-like lines

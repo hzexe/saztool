@@ -25,7 +25,35 @@ Use this skill when the user asks to:
 3. Run `saztool show <bundle> <session-id>` on selected ids
 ```
 
-## 2. MCP wrapper contract suggestion
+## 2. Parameter notes for wrappers and skills
+
+When exposing `saztool` through OpenClaw or MCP, make the parameter semantics explicit:
+
+### normalize parameters
+- `input` (required): SAZ archive path
+- `outDir` (optional): output bundle path; default `<input>.norm`
+
+### show parameters
+- `bundleDir` (required): normalized bundle path
+- `sessionId` (required): Fiddler session id
+- `bodyPreview` (optional, default `600`): preview length for decoded text
+
+### search parameters
+- `bundleDir` (required)
+- `query` (required)
+- `in` (optional)
+  - allowed values: `body`, `meta`, `request`, `response`, `all`
+  - allow comma-separated subsets like `request,response`
+  - default behavior if omitted: `body + meta`
+- `beforeId` (optional)
+- `afterId` (optional)
+- `context` (optional, default `0`)
+- `bodyPreview` (optional, default `160`)
+- `output` (optional)
+  - allowed values: `plain`, `grep`, `json`
+  - default: `plain`
+
+## 3. MCP wrapper contract suggestion
 
 If you create a separate `saztool-mcp` wrapper, expose these tools:
 
@@ -62,14 +90,14 @@ Input:
 }
 ```
 
-## 3. Recommended OpenClaw execution style
+## 4. Recommended OpenClaw execution style
 
 For tool-oriented automation:
 - use `exec` for local CLI calls
 - use `--output json` when downstream parsing matters
 - prefer skill orchestration for multi-step analysis sessions
 
-## 4. Why this matters
+## 5. Why this matters
 
 The CLI should remain the single source of truth for parsing, search, and normalization logic.
 Wrappers and skills should stay thin.
