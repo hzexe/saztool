@@ -72,6 +72,7 @@ type SessionMeta struct {
 	StatusMarkers          []string `json:"statusMarkers,omitempty"`
 	BodyMissing            bool     `json:"bodyMissing"`
 	BodyTruncated          bool     `json:"bodyTruncated"`
+	TruncationReason       string   `json:"truncationReason,omitempty"`
 	DecodeFailed           bool     `json:"decodeFailed"`
 	BinaryBodySkipped      bool     `json:"binaryBodySkipped"`
 	DecodeFailureReason    string   `json:"decodeFailureReason,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hzexe/saz-tool/internal/model"
@@ -78,4 +79,48 @@ func TestNormalizeTimelineOnRealCapturedSample(t *testing.T) {
 	if len(manifest.TimelineSessionOrder) == 0 {
 		t.Fatalf("expected timeline session order in manifest: %#v", manifest)
 	}
+}
+
+func TestNormalizeCapturedImageMarksBinarySkipped(t *testing.T) {
+	input := filepath.Clean("/home/hzexe/.openclaw/media/inbound/codex---3b73c252-d1bd-4e73-9767-c6bcdcfcebc4.zip")
+	outDir := filepath.Join(t.TempDir(), "image.norm")
+	if err := Normalize(input, outDir); err != nil {
+		t.Fatalf("Normalize failed: %v", err)
+	}
+	metaPath := filepath.Join(outDir, "sessions", "000007", "meta.json")
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatalf("read meta failed: %v", err)
+	}
+	var meta model.SessionMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		t.Fatalf("unmarshal meta failed: %v", err)
+	}
+	if !meta.BinaryBodySkipped {
+		t.Fatalf("expected binary body skipped: %#v", meta)
+	}
+	if !containsString(meta.StatusMarkers, "binary-body-skipped") {
+		t.Fatalf("expected binary-body-skipped marker: %#v", meta.StatusMarkers)
+	}
+	if !containsNote(meta.NormalizationNotes, "non-text") {
+		t.Fatalf("expected non-text note: %#v", meta.NormalizationNotes)
+	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, v := range values {
+		if v == target {
+			return true
+		}
+	}
+	return false
+}
+
+func containsNote(values []string, target string) bool {
+	for _, v := range values {
+		if strings.Contains(v, target) {
+			return true
+		}
+	}
+	return false
 }

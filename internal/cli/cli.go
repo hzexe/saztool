@@ -100,6 +100,9 @@ func runShow(args []string) error {
 	if meta.DecodeFailureReason != "" {
 		fmt.Printf("decodeFailureReason: %s\n", meta.DecodeFailureReason)
 	}
+	if meta.TruncationReason != "" {
+		fmt.Printf("truncationReason: %s\n", meta.TruncationReason)
+	}
 	fmt.Printf("sourceRequestPath: %s\n", fallback(meta.SourceRequestPath, "-"))
 	fmt.Printf("sourceResponsePath: %s\n", fallback(meta.SourceResponsePath, "-"))
 	fmt.Printf("transforms: %s\n", joinOrDash(meta.Transforms))

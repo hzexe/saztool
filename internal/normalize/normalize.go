@@ -117,6 +117,10 @@ func Normalize(inputPath, outDir string) error {
 			MetaPath:        relative(outDir, metaPath),
 		}
 
+		if session.Request == nil {
+			meta.NormalizationNotes = append(meta.NormalizationNotes, "request file missing in source SAZ")
+		}
+
 		if session.Request != nil {
 			if err := os.WriteFile(requestPath, session.Request.Data, 0o644); err != nil {
 				return err
@@ -132,6 +136,7 @@ func Normalize(inputPath, outDir string) error {
 		if session.Response == nil {
 			meta.BodyMissing = true
 			meta.StatusMarkers = append(meta.StatusMarkers, "body-missing")
+			meta.NormalizationNotes = append(meta.NormalizationNotes, "response file missing in source SAZ")
 			summary.StatusMarkers = append(summary.StatusMarkers, "body-missing")
 		} else {
 			if err := os.WriteFile(responsePath, session.Response.Data, 0o644); err != nil {
@@ -142,12 +147,14 @@ func Normalize(inputPath, outDir string) error {
 				meta.DecodeFailed = true
 				meta.DecodeFailureReason = err.Error()
 				meta.StatusMarkers = append(meta.StatusMarkers, "decode-failed")
+				meta.NormalizationNotes = append(meta.NormalizationNotes, "response parse failed before decode completion")
 				summary.StatusMarkers = append(summary.StatusMarkers, "decode-failed")
 			} else {
 				if parsedResp.DecodeFailed {
 					meta.DecodeFailed = true
 					meta.DecodeFailureReason = parsedResp.DecodeFailure
 					meta.StatusMarkers = append(meta.StatusMarkers, "decode-failed")
+					meta.NormalizationNotes = append(meta.NormalizationNotes, "body decode failed after partial normalization")
 					summary.StatusMarkers = append(summary.StatusMarkers, "decode-failed")
 				}
 				meta.StatusCode = parsedResp.StatusCode
@@ -162,12 +169,15 @@ func Normalize(inputPath, outDir string) error {
 				if len(parsedResp.BodyRaw) == 0 {
 					meta.BodyMissing = true
 					meta.StatusMarkers = append(meta.StatusMarkers, "body-missing")
+					meta.NormalizationNotes = append(meta.NormalizationNotes, "response file present but body length is zero")
 					summary.StatusMarkers = append(summary.StatusMarkers, "body-missing")
 				}
 				contentLength := inferContentLength(session.Response.Data)
 				if contentLength > 0 && len(parsedResp.BodyRaw) > 0 && len(parsedResp.BodyRaw) < contentLength {
 					meta.BodyTruncated = true
+					meta.TruncationReason = fmt.Sprintf("body bytes %d smaller than content-length %d", len(parsedResp.BodyRaw), contentLength)
 					meta.StatusMarkers = append(meta.StatusMarkers, "body-truncated")
+					meta.NormalizationNotes = append(meta.NormalizationNotes, "body appears shorter than declared content-length")
 					summary.StatusMarkers = append(summary.StatusMarkers, "body-truncated")
 				}
 				if parsedResp.BodyIsText {
@@ -180,6 +190,7 @@ func Normalize(inputPath, outDir string) error {
 				} else {
 					meta.BinaryBodySkipped = true
 					meta.StatusMarkers = append(meta.StatusMarkers, "binary-body-skipped")
+					meta.NormalizationNotes = append(meta.NormalizationNotes, "body treated as non-text and canonical decoded text was skipped")
 					summary.StatusMarkers = append(summary.StatusMarkers, "binary-body-skipped")
 				}
 			}
