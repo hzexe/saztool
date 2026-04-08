@@ -65,6 +65,9 @@ If you wrap it for MCP, expose these inputs clearly:
 - `afterId`
 - `context`
 - `bodyPreview`
+- `output`
+
+For wrappers, prefer `output: "json"` so downstream agents can parse a stable machine-readable result.
 
 ## 4. AI-facing guidance
 
@@ -75,7 +78,18 @@ When an AI agent sees `saztool`, it should understand:
 - `search` is the discovery command
 - Fiddler id order and timeline order are different concepts
 
-## 5. Good packaging pattern
+## 5. Practical OpenClaw path
+
+For OpenClaw specifically, a good progression is:
+1. use the CLI directly while behavior is still evolving
+2. standardize on `--output json` for machine-driven flows
+3. add a thin skill or MCP wrapper once the contract is stable
+
+See also:
+- `docs/CLI.md`
+- `docs/OPENCLAW_TEMPLATES.md`
+
+## 6. Good packaging pattern
 
 If you later publish an MCP wrapper, keep this repo focused on the core CLI and create a companion repo like:
 - `saztool-mcp`

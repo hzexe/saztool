@@ -98,6 +98,12 @@ Compact output intended for shell pipelines and quick scanning. Format is roughl
 #### `json`
 Structured result array intended for scripts, MCP wrappers, or AI tooling.
 
+Current contract notes:
+- top-level output is a JSON array
+- each item includes summary metadata, score, matched scopes, line lists, preview, and detailed match entries
+- consumers should treat unknown future fields as additive
+- wrappers should prefer field lookup over positional assumptions
+
 ## Defaults and semantics
 
 - Canonical order = ascending Fiddler session id

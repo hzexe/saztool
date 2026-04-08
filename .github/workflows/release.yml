@@ -71,7 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "${{ steps.tag.outputs.value }}" >/dev/null 2>&1 || \
-            gh release create "${{ steps.tag.outputs.value }}" --title "${{ steps.tag.outputs.value }}" --notes "Automated release for saztool"
+            gh release create "${{ steps.tag.outputs.value }}" --title "${{ steps.tag.outputs.value }}" --notes-file .github/release-notes.md
 
       - name: Upload release assets
         env:

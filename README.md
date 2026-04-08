@@ -104,6 +104,7 @@ saztool search demo.saz.norm token --output json
 更完整的参数与语义见：
 - `docs/CLI.md`
 - `docs/INTEGRATIONS.md`
+- `docs/OPENCLAW_TEMPLATES.md`
 
 ## 说明
 
@@ -119,9 +120,11 @@ saztool search demo.saz.norm token --output json
 - timeline order
 - GitHub Actions 构建与 release 自动化基础设施
 - 仓库内 `testdata/` 用于 CI 可复现测试
+- `--output plain|grep|json` 适配人工、grep 风格和机器消费三类场景
 
 还待补：
 - 更多 binary body 导出策略
 - 将 before/after 过滤同时支持时间顺序语义
 - 直接支持 raw 目录输入
 - 更丰富的 release / packaging 文档
+- 独立 `saztool-mcp` 包装器实现（当前已有模板与建议，但未单独实现）
