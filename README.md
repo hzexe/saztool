@@ -77,6 +77,9 @@ saztool normalize demo.saz -out demo.norm
 saztool show demo.saz.norm 123
 saztool search demo.saz.norm keyword
 saztool search demo.saz.norm token --after-id 100 --before-id 200
+saztool search demo.saz.norm token --in body
+saztool search demo.saz.norm token --in request,response
+saztool search demo.saz.norm token --in all
 ```
 
 ## 说明

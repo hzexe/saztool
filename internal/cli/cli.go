@@ -112,7 +112,7 @@ func runShow(args []string) error {
 }
 
 func runSearch(args []string) error {
-	bundleDir, query, bodyPreview, beforeID, afterID, err := parseSearchInputs(args)
+	bundleDir, query, bodyPreview, beforeID, afterID, scopes, err := parseSearchInputs(args)
 	if err != nil {
 		return err
 	}
@@ -123,15 +123,18 @@ func runSearch(args []string) error {
 	}
 
 	type result struct {
-		Summary    model.SessionSummary
-		Score      int
-		Where      []string
-		Preview    string
-		BodyLines  []int
-		MetaLines  []int
+		Summary       model.SessionSummary
+		Score         int
+		Where         []string
+		Preview       string
+		BodyLines     []int
+		MetaLines     []int
+		RequestLines  []int
+		ResponseLines []int
 	}
 
 	results := make([]result, 0)
+	queryLower := strings.ToLower(query)
 	for _, s := range manifest.Sessions {
 		if beforeID > 0 && s.SessionID >= beforeID {
 			continue
@@ -142,53 +145,104 @@ func runSearch(args []string) error {
 
 		score := 0
 		where := make([]string, 0)
-		metaLineHits := make([]int, 0)
-		if strings.Contains(strings.ToLower(s.URL), query) {
-			score += 4
-			where = append(where, "url")
-		}
-		if strings.Contains(strings.ToLower(s.Method), query) {
-			score += 2
-			where = append(where, "method")
-		}
-		if strings.Contains(strings.ToLower(strconv.Itoa(s.StatusCode)), query) {
-			score += 1
-			where = append(where, "status")
-		}
 		preview := ""
 		bodyLineHits := make([]int, 0)
-		if s.DecodedBodyPath != "" {
-			decodedPath := filepath.Join(bundleDir, filepath.FromSlash(s.DecodedBodyPath))
-			body, err := os.ReadFile(decodedPath)
-			if err == nil {
-				bodyText := string(body)
-				bodyLineHits = findLineMatches(bodyText, query)
-				if len(bodyLineHits) > 0 {
-					score += 8
-					where = append(where, "body")
-					idx := strings.Index(strings.ToLower(bodyText), query)
-					preview = excerpt(bodyText, idx, bodyPreview)
+		metaLineHits := make([]int, 0)
+		requestLineHits := make([]int, 0)
+		responseLineHits := make([]int, 0)
+
+		if scopes["body"] || scopes["meta"] {
+			if scopes["body"] {
+				if strings.Contains(strings.ToLower(s.URL), queryLower) {
+					score += 4
+					where = append(where, "url")
+				}
+				if strings.Contains(strings.ToLower(s.Method), queryLower) {
+					score += 2
+					where = append(where, "method")
+				}
+				if strings.Contains(strings.ToLower(strconv.Itoa(s.StatusCode)), queryLower) {
+					score += 1
+					where = append(where, "status")
+				}
+			}
+
+			if scopes["body"] && s.DecodedBodyPath != "" {
+				decodedPath := filepath.Join(bundleDir, filepath.FromSlash(s.DecodedBodyPath))
+				body, err := os.ReadFile(decodedPath)
+				if err == nil {
+					bodyText := string(body)
+					bodyLineHits = findLineMatches(bodyText, queryLower)
+					if len(bodyLineHits) > 0 {
+						score += 8
+						where = append(where, "body")
+						if preview == "" {
+							idx := strings.Index(strings.ToLower(bodyText), queryLower)
+							preview = excerpt(bodyText, idx, bodyPreview)
+						}
+					}
+				}
+			}
+
+			if scopes["meta"] {
+				metaPath := filepath.Join(bundleDir, filepath.FromSlash(s.MetaPath))
+				if metaBytes, err := os.ReadFile(metaPath); err == nil {
+					metaText := string(metaBytes)
+					metaLineHits = findLineMatches(metaText, queryLower)
+					if len(metaLineHits) > 0 {
+						score += 3
+						where = append(where, "meta")
+						if preview == "" {
+							idx := strings.Index(strings.ToLower(metaText), queryLower)
+							preview = excerpt(metaText, idx, bodyPreview)
+						}
+					}
 				}
 			}
 		}
 
-		metaPath := filepath.Join(bundleDir, filepath.FromSlash(s.MetaPath))
-		if metaBytes, err := os.ReadFile(metaPath); err == nil {
-			metaLineHits = findLineMatches(string(metaBytes), query)
-			if len(metaLineHits) > 0 {
-				score += 3
-				where = append(where, "meta")
+		if scopes["request"] {
+			requestPath := filepath.Join(bundleDir, filepath.FromSlash(s.RequestPath))
+			if reqBytes, err := os.ReadFile(requestPath); err == nil {
+				reqText := string(reqBytes)
+				requestLineHits = findLineMatches(reqText, queryLower)
+				if len(requestLineHits) > 0 {
+					score += 6
+					where = append(where, "request")
+					if preview == "" {
+						idx := strings.Index(strings.ToLower(reqText), queryLower)
+						preview = excerpt(reqText, idx, bodyPreview)
+					}
+				}
+			}
+		}
+
+		if scopes["response"] {
+			responsePath := filepath.Join(bundleDir, filepath.FromSlash(s.ResponsePath))
+			if respBytes, err := os.ReadFile(responsePath); err == nil {
+				respText := string(respBytes)
+				responseLineHits = findLineMatches(respText, queryLower)
+				if len(responseLineHits) > 0 {
+					score += 6
+					where = append(where, "response")
+					if preview == "" {
+						idx := strings.Index(strings.ToLower(respText), queryLower)
+						preview = excerpt(respText, idx, bodyPreview)
+					}
+				}
 			}
 		}
 
 		if score > 0 {
 			results = append(results, result{
-				Summary:   s,
-				Score:     score,
-				Where:     dedupe(where),
-				Preview:   preview,
-				BodyLines: bodyLineHits,
-				MetaLines: metaLineHits,
+				Summary:       s,
+				Score:         score,
+				Where:         dedupe(where),
+				Preview:       preview,
+				BodyLines:     bodyLineHits,
+				MetaLines:     metaLineHits,
+				RequestLines:  requestLineHits,
+				ResponseLines: responseLineHits,
 			})
 		}
 	}
@@ -215,6 +269,12 @@ func runSearch(args []string) error {
 		if len(r.MetaLines) > 0 {
 			fmt.Printf("meta_lines=%s\n", intsToCSV(r.MetaLines))
 		}
+		if len(r.RequestLines) > 0 {
+			fmt.Printf("request_lines=%s\n", intsToCSV(r.RequestLines))
+		}
+		if len(r.ResponseLines) > 0 {
+			fmt.Printf("response_lines=%s\n", intsToCSV(r.ResponseLines))
+		}
 		if r.Preview != "" {
 			fmt.Printf("preview=%s\n", r.Preview)
 		}
@@ -224,7 +284,7 @@ func runSearch(args []string) error {
 }
 
 func printUsage() {
-	fmt.Println(`saztool - Fiddler SAZ normalize/search helper
+	fmt.Print(`saztool - Fiddler SAZ normalize/search helper
 
 Commands:
   normalize <file.saz> [-out dir]        Export normalized bundle
@@ -261,8 +321,9 @@ func parseNormalizeInputs(args []string) (input string, outDir string, err error
 	return
 }
 
-func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, err error) {
+func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, scopes map[string]bool, err error) {
 	bodyPreview = 160
+	scopeValue := ""
 	remaining := make([]string, 0, len(args))
 
 	for i := 0; i < len(args); i++ {
@@ -319,13 +380,22 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 				err = fmt.Errorf("invalid --after-id value: %w", err)
 				return
 			}
+		case arg == "--in":
+			if i+1 >= len(args) {
+				err = errors.New("--in requires a value")
+				return
+			}
+			scopeValue = args[i+1]
+			i++
+		case strings.HasPrefix(arg, "--in="):
+			scopeValue = strings.TrimPrefix(arg, "--in=")
 		default:
 			remaining = append(remaining, arg)
 		}
 	}
 
 	if len(remaining) < 2 {
-		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N]")
+		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N] [--in body|meta|request|response|all]")
 		return
 	}
 
@@ -339,7 +409,42 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 		err = errors.New("after-id must be less than before-id when both are set")
 		return
 	}
+	if scopes, err = parseSearchScopes(scopeValue); err != nil {
+		return
+	}
 	return
+}
+
+func parseSearchScopes(value string) (map[string]bool, error) {
+	defaultScopes := map[string]bool{
+		"body": true,
+		"meta": true,
+	}
+	if strings.TrimSpace(value) == "" {
+		return defaultScopes, nil
+	}
+
+	result := map[string]bool{}
+	parts := strings.Split(value, ",")
+	for _, part := range parts {
+		p := strings.ToLower(strings.TrimSpace(part))
+		if p == "" {
+			continue
+		}
+		if p == "all" {
+			return map[string]bool{"body": true, "meta": true, "request": true, "response": true}, nil
+		}
+		switch p {
+		case "body", "meta", "request", "response":
+			result[p] = true
+		default:
+			return nil, fmt.Errorf("invalid --in scope: %s", p)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.New("--in cannot be empty")
+	}
+	return result, nil
 }
 
 func readManifest(bundleDir string) (*model.Manifest, error) {
