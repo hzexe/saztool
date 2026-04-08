@@ -24,7 +24,7 @@ func TestDedupeStrings(t *testing.T) {
 }
 
 func TestNormalizeStatusMarkersOnRealSample(t *testing.T) {
-	input := filepath.Clean("/home/hzexe/.openclaw/workspace/tmp/public-saz/multipleSessions.saz")
+	input := filepath.Clean(filepath.Join("..", "..", "testdata", "multipleSessions.saz"))
 	outDir := filepath.Join(t.TempDir(), "sample.norm")
 	if err := Normalize(input, outDir); err != nil {
 		t.Fatalf("Normalize failed: %v", err)
@@ -48,7 +48,7 @@ func TestNormalizeStatusMarkersOnRealSample(t *testing.T) {
 }
 
 func TestNormalizeTimelineOnRealCapturedSample(t *testing.T) {
-	input := filepath.Clean("/home/hzexe/.openclaw/media/inbound/codex---3b73c252-d1bd-4e73-9767-c6bcdcfcebc4.zip")
+	input := filepath.Clean(filepath.Join("..", "..", "testdata", "real-chatgpt-capture.saz"))
 	outDir := filepath.Join(t.TempDir(), "captured.norm")
 	if err := Normalize(input, outDir); err != nil {
 		t.Fatalf("Normalize failed: %v", err)
@@ -82,7 +82,7 @@ func TestNormalizeTimelineOnRealCapturedSample(t *testing.T) {
 }
 
 func TestNormalizeCapturedImageMarksBinarySkipped(t *testing.T) {
-	input := filepath.Clean("/home/hzexe/.openclaw/media/inbound/codex---3b73c252-d1bd-4e73-9767-c6bcdcfcebc4.zip")
+	input := filepath.Clean(filepath.Join("..", "..", "testdata", "real-chatgpt-capture.saz"))
 	outDir := filepath.Join(t.TempDir(), "image.norm")
 	if err := Normalize(input, outDir); err != nil {
 		t.Fatalf("Normalize failed: %v", err)

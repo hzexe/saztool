@@ -1,6 +1,12 @@
 # saz-tool
 
-一个面向 **Fiddler `.saz`** 的跨平台 CLI 工具，目标是把抓包导出为对 AI 和人工分析都更友好的 **normalized bundle**，同时**不破坏原始内容**。
+`saztool` 是一个面向 **Fiddler SAZ 抓包** 的 CLI 工具，用于：
+- 归一化抓包内容
+- 按 session 查看请求/响应
+- 在 body / meta / raw request / raw response 中搜索
+- 为 AI 或人工分析生成可追溯的 normalized bundle
+
+目标不是取代 Fiddler，而是把 SAZ 变成**更适合检索、排查、逆向分析和自动化处理**的格式，同时**不破坏原始内容**。
 
 ## 当前定位
 
@@ -91,6 +97,8 @@ saztool search demo.saz.norm token --in body
 saztool search demo.saz.norm token --in request,response
 saztool search demo.saz.norm token --in all
 saztool search demo.saz.norm token --in request -C 2
+saztool search demo.saz.norm token --output grep
+saztool search demo.saz.norm token --output json
 ```
 
 更完整的参数与语义见：
@@ -110,6 +118,7 @@ saztool search demo.saz.norm token --in request -C 2
 - session 状态标记
 - timeline order
 - GitHub Actions 构建与 release 自动化基础设施
+- 仓库内 `testdata/` 用于 CI 可复现测试
 
 还待补：
 - 更多 binary body 导出策略

@@ -125,8 +125,20 @@ type matchDetail struct {
 	Context []string
 }
 
+type searchResult struct {
+	Summary       model.SessionSummary
+	Score         int
+	Where         []string
+	Preview       string
+	BodyLines     []int
+	MetaLines     []int
+	RequestLines  []int
+	ResponseLines []int
+	Matches       []matchDetail
+}
+
 func runSearch(args []string) error {
-	bundleDir, query, bodyPreview, beforeID, afterID, scopes, contextLines, err := parseSearchInputs(args)
+	bundleDir, query, bodyPreview, beforeID, afterID, scopes, contextLines, outputFormat, err := parseSearchInputs(args)
 	if err != nil {
 		return err
 	}
@@ -136,19 +148,7 @@ func runSearch(args []string) error {
 		return err
 	}
 
-	type result struct {
-		Summary       model.SessionSummary
-		Score         int
-		Where         []string
-		Preview       string
-		BodyLines     []int
-		MetaLines     []int
-		RequestLines  []int
-		ResponseLines []int
-		Matches       []matchDetail
-	}
-
-	results := make([]result, 0)
+	results := make([]searchResult, 0)
 	queryLower := strings.ToLower(query)
 	for _, s := range manifest.Sessions {
 		if beforeID > 0 && s.SessionID >= beforeID {
@@ -254,7 +254,7 @@ func runSearch(args []string) error {
 		}
 
 		if score > 0 {
-			results = append(results, result{
+			results = append(results, searchResult{
 				Summary:       s,
 				Score:         score,
 				Where:         dedupe(where),
@@ -276,38 +276,22 @@ func runSearch(args []string) error {
 	})
 
 	if len(results) == 0 {
+		if outputFormat == "json" {
+			fmt.Println("[]")
+			return nil
+		}
 		fmt.Println("no matches")
 		return nil
 	}
 
-	for _, r := range results {
-		fmt.Printf("session=%d ordinal=%d score=%d method=%s status=%d\n", r.Summary.SessionID, r.Summary.Ordinal, r.Score, fallback(r.Summary.Method, "-"), r.Summary.StatusCode)
-		fmt.Printf("url=%s\n", fallback(r.Summary.URL, "-"))
-		fmt.Printf("where=%s\n", joinOrDash(r.Where))
-		if len(r.BodyLines) > 0 {
-			fmt.Printf("body_lines=%s\n", intsToCSV(r.BodyLines))
-		}
-		if len(r.MetaLines) > 0 {
-			fmt.Printf("meta_lines=%s\n", intsToCSV(r.MetaLines))
-		}
-		if len(r.RequestLines) > 0 {
-			fmt.Printf("request_lines=%s\n", intsToCSV(r.RequestLines))
-		}
-		if len(r.ResponseLines) > 0 {
-			fmt.Printf("response_lines=%s\n", intsToCSV(r.ResponseLines))
-		}
-		if r.Preview != "" {
-			fmt.Printf("preview=%s\n", r.Preview)
-		}
-		for _, m := range r.Matches {
-			fmt.Printf("match source=%s line=%d text=%s\n", m.Source, m.Line, m.Text)
-			for _, ctx := range m.Context {
-				fmt.Printf("context %s\n", ctx)
-			}
-		}
-		fmt.Println()
+	switch outputFormat {
+	case "json":
+		return printSearchResultsJSON(results)
+	case "grep":
+		return printSearchResultsGrep(results)
+	default:
+		return printSearchResultsPlain(results)
 	}
-	return nil
 }
 
 func printUsage() {
@@ -348,9 +332,10 @@ func parseNormalizeInputs(args []string) (input string, outDir string, err error
 	return
 }
 
-func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, scopes map[string]bool, contextLines int, err error) {
+func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, scopes map[string]bool, contextLines int, outputFormat string, err error) {
 	bodyPreview = 160
 	contextLines = 0
+	outputFormat = "plain"
 	scopeValue := ""
 	remaining := make([]string, 0, len(args))
 
@@ -431,6 +416,15 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 				err = fmt.Errorf("invalid --after-id value: %w", err)
 				return
 			}
+		case arg == "--output":
+			if i+1 >= len(args) {
+				err = errors.New("--output requires a value")
+				return
+			}
+			outputFormat = strings.ToLower(args[i+1])
+			i++
+		case strings.HasPrefix(arg, "--output="):
+			outputFormat = strings.ToLower(strings.TrimPrefix(arg, "--output="))
 		case arg == "--in":
 			if i+1 >= len(args) {
 				err = errors.New("--in requires a value")
@@ -446,7 +440,7 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 	}
 
 	if len(remaining) < 2 {
-		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N] [--in body|meta|request|response|all] [-C N]")
+		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N] [--in body|meta|request|response|all] [-C N] [--output plain|grep|json]")
 		return
 	}
 
@@ -461,6 +455,10 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 		return
 	}
 	if scopes, err = parseSearchScopes(scopeValue); err != nil {
+		return
+	}
+	if outputFormat != "plain" && outputFormat != "grep" && outputFormat != "json" {
+		err = fmt.Errorf("invalid --output value: %s", outputFormat)
 		return
 	}
 	return
@@ -496,6 +494,55 @@ func parseSearchScopes(value string) (map[string]bool, error) {
 		return nil, errors.New("--in cannot be empty")
 	}
 	return result, nil
+}
+
+func printSearchResultsPlain(results []searchResult) error {
+	for _, r := range results {
+		fmt.Printf("session=%d ordinal=%d score=%d method=%s status=%d\n", r.Summary.SessionID, r.Summary.Ordinal, r.Score, fallback(r.Summary.Method, "-"), r.Summary.StatusCode)
+		fmt.Printf("url=%s\n", fallback(r.Summary.URL, "-"))
+		fmt.Printf("where=%s\n", joinOrDash(r.Where))
+		if len(r.BodyLines) > 0 {
+			fmt.Printf("body_lines=%s\n", intsToCSV(r.BodyLines))
+		}
+		if len(r.MetaLines) > 0 {
+			fmt.Printf("meta_lines=%s\n", intsToCSV(r.MetaLines))
+		}
+		if len(r.RequestLines) > 0 {
+			fmt.Printf("request_lines=%s\n", intsToCSV(r.RequestLines))
+		}
+		if len(r.ResponseLines) > 0 {
+			fmt.Printf("response_lines=%s\n", intsToCSV(r.ResponseLines))
+		}
+		if r.Preview != "" {
+			fmt.Printf("preview=%s\n", r.Preview)
+		}
+		for _, m := range r.Matches {
+			fmt.Printf("match source=%s line=%d text=%s\n", m.Source, m.Line, m.Text)
+			for _, ctx := range m.Context {
+				fmt.Printf("context %s\n", ctx)
+			}
+		}
+		fmt.Println()
+	}
+	return nil
+}
+
+func printSearchResultsGrep(results []searchResult) error {
+	for _, r := range results {
+		for _, m := range r.Matches {
+			fmt.Printf("%d:%s:%d:%s\n", r.Summary.SessionID, m.Source, m.Line, m.Text)
+			for _, ctx := range m.Context {
+				fmt.Printf("%d:%s:%s\n", r.Summary.SessionID, m.Source, ctx)
+			}
+		}
+	}
+	return nil
+}
+
+func printSearchResultsJSON(results []searchResult) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(results)
 }
 
 func buildMatchDetails(source, text, query string, contextLines int) []matchDetail {

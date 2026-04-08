@@ -65,25 +65,32 @@ func TestParseNormalizeInputsBothOrders(t *testing.T) {
 }
 
 func TestParseSearchInputsOptionOrder(t *testing.T) {
-	bundle, query, _, beforeID, afterID, scopes, contextLines, err := parseSearchInputs([]string{"bundle.norm", "token", "--before-id", "20", "--after-id", "10", "--in", "request", "-C", "2"})
+	bundle, query, _, beforeID, afterID, scopes, contextLines, outputFormat, err := parseSearchInputs([]string{"bundle.norm", "token", "--before-id", "20", "--after-id", "10", "--in", "request", "-C", "2", "--output", "grep"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 2 {
-		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d", bundle, query, beforeID, afterID, contextLines)
+	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 2 || outputFormat != "grep" {
+		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d output=%q", bundle, query, beforeID, afterID, contextLines, outputFormat)
 	}
 	if !scopes["request"] || scopes["body"] {
 		t.Fatalf("unexpected scopes: %#v", scopes)
 	}
 
-	bundle, query, _, beforeID, afterID, scopes, contextLines, err = parseSearchInputs([]string{"--in", "response", "--after-id", "10", "bundle.norm", "token", "--before-id", "20"})
+	bundle, query, _, beforeID, afterID, scopes, contextLines, outputFormat, err = parseSearchInputs([]string{"--in", "response", "--after-id", "10", "bundle.norm", "token", "--before-id", "20"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 0 {
-		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d", bundle, query, beforeID, afterID, contextLines)
+	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 0 || outputFormat != "plain" {
+		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d output=%q", bundle, query, beforeID, afterID, contextLines, outputFormat)
 	}
 	if !scopes["response"] || scopes["meta"] {
 		t.Fatalf("unexpected scopes: %#v", scopes)
+	}
+}
+
+func TestParseSearchInputsInvalidOutput(t *testing.T) {
+	_, _, _, _, _, _, _, _, err := parseSearchInputs([]string{"bundle.norm", "token", "--output", "bad"})
+	if err == nil {
+		t.Fatal("expected invalid output error")
 	}
 }

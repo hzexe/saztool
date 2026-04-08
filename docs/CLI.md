@@ -69,6 +69,11 @@ Options:
   - show N surrounding lines for each textual match
 - `--body-preview N`
   - max preview characters used in summary preview
+- `--output plain|grep|json`
+  - choose display format
+  - `plain`: rich human-readable default
+  - `grep`: compact grep-like lines
+  - `json`: machine-readable structured output
 
 Search result fields:
 - `session=`: Fiddler session id
@@ -77,6 +82,21 @@ Search result fields:
 - `body_lines=`, `meta_lines=`, `request_lines=`, `response_lines=`
 - `match source=... line=... text=...`
 - `context line=... text=...`
+
+### Output modes
+
+#### `plain`
+Best for interactive human inspection.
+
+#### `grep`
+Compact output intended for shell pipelines and quick scanning. Format is roughly:
+
+```text
+<sessionId>:<source>:<line>:<text>
+```
+
+#### `json`
+Structured result array intended for scripts, MCP wrappers, or AI tooling.
 
 ## Defaults and semantics
 
