@@ -7,6 +7,7 @@ type Manifest struct {
 	SourceSaz             string           `json:"sourceSaz"`
 	SourceSazBaseName     string           `json:"sourceSazBaseName"`
 	FiddlerSessionOrder   []int            `json:"fiddlerSessionOrder"`
+	TimelineSessionOrder  []int            `json:"timelineSessionOrder,omitempty"`
 	SessionCount          int              `json:"sessionCount"`
 	Sessions              []SessionSummary `json:"sessions"`
 	NormalizationPolicy   Policy           `json:"normalizationPolicy"`
@@ -29,6 +30,7 @@ type Policy struct {
 type SessionSummary struct {
 	SessionID          int      `json:"sessionId"`
 	Ordinal            int      `json:"ordinal"`
+	TimelineOrdinal    int      `json:"timelineOrdinal,omitempty"`
 	RequestPath        string   `json:"requestPath"`
 	ResponsePath       string   `json:"responsePath"`
 	MetaPath           string   `json:"metaPath"`
@@ -39,12 +41,16 @@ type SessionSummary struct {
 	StatusCode         int      `json:"statusCode,omitempty"`
 	ResponseBodyIsText bool     `json:"responseBodyIsText"`
 	StatusMarkers      []string `json:"statusMarkers,omitempty"`
+	TimelineBegin      string   `json:"timelineBegin,omitempty"`
 }
 
 // SessionMeta records provenance and transforms for a single session.
 type SessionMeta struct {
 	SessionID              int      `json:"sessionId"`
 	Ordinal                int      `json:"ordinal"`
+	TimelineOrdinal        int      `json:"timelineOrdinal,omitempty"`
+	TimelineBegin          string   `json:"timelineBegin,omitempty"`
+	TimelineEnd            string   `json:"timelineEnd,omitempty"`
 	SourceSaz              string   `json:"sourceSaz"`
 	SourceRequestPath      string   `json:"sourceRequestPath"`
 	SourceResponsePath     string   `json:"sourceResponsePath"`

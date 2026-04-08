@@ -23,6 +23,22 @@ func Normalize(inputPath, outDir string) error {
 		return err
 	}
 
+	timelineInfos := make([]archive.TimelineInfo, 0, len(sessions))
+	for _, s := range sessions {
+		timelineInfos = append(timelineInfos, archive.ExtractTimeline(s.Meta, s.SessionID))
+	}
+	timelineOrder := archive.SortTimeline(timelineInfos)
+	timelineOrdinalByID := map[int]int{}
+	for i, info := range timelineOrder {
+		if info.HasTimeline {
+			timelineOrdinalByID[info.SessionID] = i + 1
+		}
+	}
+	timelineByID := map[int]archive.TimelineInfo{}
+	for _, info := range timelineInfos {
+		timelineByID[info.SessionID] = info
+	}
+
 	manifest := model.Manifest{
 		Format:            "fiddler-saz-normalized-bundle",
 		FormatVersion:     "0.1.0",
@@ -45,7 +61,14 @@ func Normalize(inputPath, outDir string) error {
 		Notes: []string{
 			"This directory is a derived normalized export from a Fiddler SAZ archive.",
 			"Fiddler session ids and ascending order are preserved explicitly.",
+			"Timeline order is derived from raw/*_m.xml SessionTimers.ClientBeginRequest when available.",
 		},
+	}
+
+	for _, info := range timelineOrder {
+		if info.HasTimeline {
+			manifest.TimelineSessionOrder = append(manifest.TimelineSessionOrder, info.SessionID)
+		}
 	}
 
 	for idx, session := range sessions {
@@ -61,9 +84,14 @@ func Normalize(inputPath, outDir string) error {
 		responsePath := filepath.Join(sessionDir, "response.raw.txt")
 		metaPath := filepath.Join(sessionDir, "meta.json")
 
+		timelineInfo := timelineByID[session.SessionID]
+
 		meta := model.SessionMeta{
 			SessionID:          session.SessionID,
 			Ordinal:            ordinal,
+			TimelineOrdinal:    timelineOrdinalByID[session.SessionID],
+			TimelineBegin:      timelineInfo.Begin,
+			TimelineEnd:        timelineInfo.End,
 			SourceSaz:          inputPath,
 			RequestPath:        relative(outDir, requestPath),
 			ResponsePath:       relative(outDir, responsePath),
@@ -80,11 +108,13 @@ func Normalize(inputPath, outDir string) error {
 		}
 
 		summary := model.SessionSummary{
-			SessionID:    session.SessionID,
-			Ordinal:      ordinal,
-			RequestPath:  meta.RequestPath,
-			ResponsePath: meta.ResponsePath,
-			MetaPath:     relative(outDir, metaPath),
+			SessionID:       session.SessionID,
+			Ordinal:         ordinal,
+			TimelineOrdinal: timelineOrdinalByID[session.SessionID],
+			TimelineBegin:   timelineInfo.Begin,
+			RequestPath:     meta.RequestPath,
+			ResponsePath:    meta.ResponsePath,
+			MetaPath:        relative(outDir, metaPath),
 		}
 
 		if session.Request != nil {
