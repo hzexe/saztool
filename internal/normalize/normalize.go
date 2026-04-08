@@ -1,8 +1,11 @@
 package normalize
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -69,6 +72,7 @@ func Normalize(inputPath, outDir string) error {
 			Transforms:         []string{},
 			BodyExactAfterDecode: true,
 			JSONPrettyPrinted:  false,
+			StatusMarkers:      []string{},
 			NormalizationNotes: []string{
 				"Ordinal is the ascending order by Fiddler session id found in raw/*.txt",
 				"Canonical normalized body only removes transport encodings and decodes charset",
@@ -76,11 +80,11 @@ func Normalize(inputPath, outDir string) error {
 		}
 
 		summary := model.SessionSummary{
-			SessionID:   session.SessionID,
-			Ordinal:     ordinal,
-			RequestPath: meta.RequestPath,
+			SessionID:    session.SessionID,
+			Ordinal:      ordinal,
+			RequestPath:  meta.RequestPath,
 			ResponsePath: meta.ResponsePath,
-			MetaPath:    relative(outDir, metaPath),
+			MetaPath:     relative(outDir, metaPath),
 		}
 
 		if session.Request != nil {
@@ -95,11 +99,27 @@ func Normalize(inputPath, outDir string) error {
 			}
 		}
 
-		if session.Response != nil {
+		if session.Response == nil {
+			meta.BodyMissing = true
+			meta.StatusMarkers = append(meta.StatusMarkers, "body-missing")
+			summary.StatusMarkers = append(summary.StatusMarkers, "body-missing")
+		} else {
 			if err := os.WriteFile(responsePath, session.Response.Data, 0o644); err != nil {
 				return err
 			}
-			if parsedResp, err := decode.ParseResponse(session.Response.Data); err == nil {
+			parsedResp, err := decode.ParseResponse(session.Response.Data)
+			if err != nil {
+				meta.DecodeFailed = true
+				meta.DecodeFailureReason = err.Error()
+				meta.StatusMarkers = append(meta.StatusMarkers, "decode-failed")
+				summary.StatusMarkers = append(summary.StatusMarkers, "decode-failed")
+			} else {
+				if parsedResp.DecodeFailed {
+					meta.DecodeFailed = true
+					meta.DecodeFailureReason = parsedResp.DecodeFailure
+					meta.StatusMarkers = append(meta.StatusMarkers, "decode-failed")
+					summary.StatusMarkers = append(summary.StatusMarkers, "decode-failed")
+				}
 				meta.StatusCode = parsedResp.StatusCode
 				meta.ContentType = parsedResp.ContentType
 				meta.TransferEncoding = parsedResp.TransferEncoding
@@ -109,6 +129,17 @@ func Normalize(inputPath, outDir string) error {
 				meta.DecodedBodyText = parsedResp.BodyIsText
 				summary.StatusCode = parsedResp.StatusCode
 				summary.ResponseBodyIsText = parsedResp.BodyIsText
+				if len(parsedResp.BodyRaw) == 0 {
+					meta.BodyMissing = true
+					meta.StatusMarkers = append(meta.StatusMarkers, "body-missing")
+					summary.StatusMarkers = append(summary.StatusMarkers, "body-missing")
+				}
+				contentLength := inferContentLength(session.Response.Data)
+				if contentLength > 0 && len(parsedResp.BodyRaw) > 0 && len(parsedResp.BodyRaw) < contentLength {
+					meta.BodyTruncated = true
+					meta.StatusMarkers = append(meta.StatusMarkers, "body-truncated")
+					summary.StatusMarkers = append(summary.StatusMarkers, "body-truncated")
+				}
 				if parsedResp.BodyIsText {
 					decodedPath := filepath.Join(sessionDir, "response.body.decoded.txt")
 					if err := os.WriteFile(decodedPath, []byte(parsedResp.BodyText), 0o644); err != nil {
@@ -116,9 +147,16 @@ func Normalize(inputPath, outDir string) error {
 					}
 					meta.DecodedBodyPath = relative(outDir, decodedPath)
 					summary.DecodedBodyPath = meta.DecodedBodyPath
+				} else {
+					meta.BinaryBodySkipped = true
+					meta.StatusMarkers = append(meta.StatusMarkers, "binary-body-skipped")
+					summary.StatusMarkers = append(summary.StatusMarkers, "binary-body-skipped")
 				}
 			}
 		}
+
+		meta.StatusMarkers = dedupeStrings(meta.StatusMarkers)
+		summary.StatusMarkers = dedupeStrings(summary.StatusMarkers)
 
 		if err := writeJSON(metaPath, meta); err != nil {
 			return err
@@ -156,6 +194,42 @@ func writeJSON(path string, v any) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+func inferContentLength(raw []byte) int {
+	sep := []byte("\r\n\r\n")
+	idx := bytes.Index(raw, sep)
+	if idx < 0 {
+		sep = []byte("\n\n")
+		idx = bytes.Index(raw, sep)
+	}
+	if idx < 0 {
+		return 0
+	}
+	headerPart := raw[:idx]
+	reader := bufio.NewReader(bytes.NewReader(append(headerPart, []byte("\r\n\r\n")...)))
+	resp, err := http.ReadResponse(reader, nil)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.ContentLength <= 0 {
+		return 0
+	}
+	return int(resp.ContentLength)
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	return out
+}
+
 func readmeText(manifest model.Manifest) string {
 	return fmt.Sprintf(`# %s
 
@@ -173,7 +247,7 @@ Session count: %d
   - decompressed when applicable
   - charset-decoded when applicable
 - JSON bodies are NOT pretty-printed in canonical normalized output.
-- meta.json records provenance and transform steps for each session.
+- meta.json records provenance, transform steps, and status markers for each session.
 
 ## Important files
 - manifest.json: bundle-level metadata, including fiddlerSessionOrder

@@ -96,6 +96,10 @@ func runShow(args []string) error {
 	fmt.Printf("decodedBodyText: %t\n", meta.DecodedBodyText)
 	fmt.Printf("bodyExactAfterDecode: %t\n", meta.BodyExactAfterDecode)
 	fmt.Printf("jsonPrettyPrinted: %t\n", meta.JSONPrettyPrinted)
+	fmt.Printf("statusMarkers: %s\n", joinOrDash(meta.StatusMarkers))
+	if meta.DecodeFailureReason != "" {
+		fmt.Printf("decodeFailureReason: %s\n", meta.DecodeFailureReason)
+	}
 	fmt.Printf("sourceRequestPath: %s\n", fallback(meta.SourceRequestPath, "-"))
 	fmt.Printf("sourceResponsePath: %s\n", fallback(meta.SourceResponsePath, "-"))
 	fmt.Printf("transforms: %s\n", joinOrDash(meta.Transforms))

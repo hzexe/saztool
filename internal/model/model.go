@@ -27,17 +27,18 @@ type Policy struct {
 
 // SessionSummary gives bundle-level indexing for one Fiddler session.
 type SessionSummary struct {
-	SessionID          int    `json:"sessionId"`
-	Ordinal            int    `json:"ordinal"`
-	RequestPath        string `json:"requestPath"`
-	ResponsePath       string `json:"responsePath"`
-	MetaPath           string `json:"metaPath"`
-	DecodedBodyPath    string `json:"decodedBodyPath,omitempty"`
-	SearchBodyPath     string `json:"searchBodyPath,omitempty"`
-	URL                string `json:"url,omitempty"`
-	Method             string `json:"method,omitempty"`
-	StatusCode         int    `json:"statusCode,omitempty"`
-	ResponseBodyIsText bool   `json:"responseBodyIsText"`
+	SessionID          int      `json:"sessionId"`
+	Ordinal            int      `json:"ordinal"`
+	RequestPath        string   `json:"requestPath"`
+	ResponsePath       string   `json:"responsePath"`
+	MetaPath           string   `json:"metaPath"`
+	DecodedBodyPath    string   `json:"decodedBodyPath,omitempty"`
+	SearchBodyPath     string   `json:"searchBodyPath,omitempty"`
+	URL                string   `json:"url,omitempty"`
+	Method             string   `json:"method,omitempty"`
+	StatusCode         int      `json:"statusCode,omitempty"`
+	ResponseBodyIsText bool     `json:"responseBodyIsText"`
+	StatusMarkers      []string `json:"statusMarkers,omitempty"`
 }
 
 // SessionMeta records provenance and transforms for a single session.
@@ -62,5 +63,11 @@ type SessionMeta struct {
 	DecodedBodyText        bool     `json:"decodedBodyText"`
 	BodyExactAfterDecode   bool     `json:"bodyExactAfterDecode"`
 	JSONPrettyPrinted      bool     `json:"jsonPrettyPrinted"`
+	StatusMarkers          []string `json:"statusMarkers,omitempty"`
+	BodyMissing            bool     `json:"bodyMissing"`
+	BodyTruncated          bool     `json:"bodyTruncated"`
+	DecodeFailed           bool     `json:"decodeFailed"`
+	BinaryBodySkipped      bool     `json:"binaryBodySkipped"`
+	DecodeFailureReason    string   `json:"decodeFailureReason,omitempty"`
 	NormalizationNotes     []string `json:"normalizationNotes"`
 }

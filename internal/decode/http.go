@@ -33,6 +33,8 @@ type ParsedHTTP struct {
 	Method           string
 	URL              string
 	StatusCode       int
+	DecodeFailed     bool
+	DecodeFailure    string
 }
 
 func ParseResponse(raw []byte) (*ParsedHTTP, error) {
@@ -113,6 +115,8 @@ func decodeHTTP(startLine string, header http.Header, body []byte, parsedTransfe
 		enc := encodings[i]
 		decoded, transform, err := decompress(p.BodyDecoded, enc)
 		if err != nil {
+			p.DecodeFailed = true
+			p.DecodeFailure = err.Error()
 			break
 		}
 		p.BodyDecoded = decoded
