@@ -1,0 +1,84 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish, for example v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+          - goos: linux
+            goarch: amd64
+            ext: ''
+          - goos: linux
+            goarch: arm64
+            ext: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release asset
+        run: |
+          mkdir -p dist
+          asset="saztool-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o "dist/${asset}" ./cmd/saztool
+          cd dist
+          if [ "${{ matrix.ext }}" = ".exe" ]; then
+            zip "${asset}.zip" "${asset}"
+          else
+            tar -czf "${asset}.tar.gz" "${asset}"
+          fi
+
+      - name: Create release if needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.tag.outputs.value }}" >/dev/null 2>&1 || \
+            gh release create "${{ steps.tag.outputs.value }}" --title "${{ steps.tag.outputs.value }}" --notes "Automated release for saztool"
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ matrix.ext }}" = ".exe" ]; then
+            gh release upload "${{ steps.tag.outputs.value }}" dist/*.zip --clobber
+          else
+            gh release upload "${{ steps.tag.outputs.value }}" dist/*.tar.gz --clobber
+          fi

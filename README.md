@@ -57,17 +57,27 @@ example.saz.norm/
 go build -o ./bin/saztool ./cmd/saztool
 ```
 
-### 交叉编译 Windows x64
+### Windows 构建
+
+本地仍可用：
 
 ```bash
-GOOS=windows GOARCH=amd64 go build -o ./bin/saztool-windows-amd64.exe ./cmd/saztool
+./build-windows.sh
 ```
 
-### 交叉编译 Windows arm64
+但仓库现在已经提供 **GitHub Actions** 作为主构建路径：
+- `.github/workflows/build-windows.yml`
+- `.github/workflows/release.yml`
 
-```bash
-GOOS=windows GOARCH=arm64 go build -o ./bin/saztool-windows-arm64.exe ./cmd/saztool
-```
+### Release 自动化
+
+- push `v*` tag 时会触发 release workflow
+- workflow 会构建 release assets 并上传到 GitHub Release
+- 当前 release assets 覆盖：
+  - windows amd64
+  - windows arm64
+  - linux amd64
+  - linux arm64
 
 ## 使用
 
@@ -80,7 +90,12 @@ saztool search demo.saz.norm token --after-id 100 --before-id 200
 saztool search demo.saz.norm token --in body
 saztool search demo.saz.norm token --in request,response
 saztool search demo.saz.norm token --in all
+saztool search demo.saz.norm token --in request -C 2
 ```
+
+更完整的参数与语义见：
+- `docs/CLI.md`
+- `docs/INTEGRATIONS.md`
 
 ## 说明
 
@@ -89,9 +104,15 @@ saztool search demo.saz.norm token --in all
 - raw session 聚合
 - response 传输层解码
 - manifest / meta / README 生成
+- search scope 控制
+- 上下文行搜索
+- 更精确的命中展示
+- session 状态标记
+- timeline order
+- GitHub Actions 构建与 release 自动化基础设施
 
 还待补：
-- 更严格的 Fiddler `m.xml` 时间顺序解析
 - 更多 binary body 导出策略
-- 搜索结果高亮与更细的字段过滤
 - 将 before/after 过滤同时支持时间顺序语义
+- 直接支持 raw 目录输入
+- 更丰富的 release / packaging 文档
