@@ -115,8 +115,15 @@ func runShow(args []string) error {
 	return nil
 }
 
+type matchDetail struct {
+	Source  string
+	Line    int
+	Text    string
+	Context []string
+}
+
 func runSearch(args []string) error {
-	bundleDir, query, bodyPreview, beforeID, afterID, scopes, err := parseSearchInputs(args)
+	bundleDir, query, bodyPreview, beforeID, afterID, scopes, contextLines, err := parseSearchInputs(args)
 	if err != nil {
 		return err
 	}
@@ -135,6 +142,7 @@ func runSearch(args []string) error {
 		MetaLines     []int
 		RequestLines  []int
 		ResponseLines []int
+		Matches       []matchDetail
 	}
 
 	results := make([]result, 0)
@@ -154,6 +162,7 @@ func runSearch(args []string) error {
 		metaLineHits := make([]int, 0)
 		requestLineHits := make([]int, 0)
 		responseLineHits := make([]int, 0)
+		matches := make([]matchDetail, 0)
 
 		if scopes["body"] || scopes["meta"] {
 			if scopes["body"] {
@@ -184,6 +193,7 @@ func runSearch(args []string) error {
 							idx := strings.Index(strings.ToLower(bodyText), queryLower)
 							preview = excerpt(bodyText, idx, bodyPreview)
 						}
+						matches = append(matches, buildMatchDetails("body", bodyText, queryLower, contextLines)...)
 					}
 				}
 			}
@@ -200,6 +210,7 @@ func runSearch(args []string) error {
 							idx := strings.Index(strings.ToLower(metaText), queryLower)
 							preview = excerpt(metaText, idx, bodyPreview)
 						}
+						matches = append(matches, buildMatchDetails("meta", metaText, queryLower, contextLines)...)
 					}
 				}
 			}
@@ -217,6 +228,7 @@ func runSearch(args []string) error {
 						idx := strings.Index(strings.ToLower(reqText), queryLower)
 						preview = excerpt(reqText, idx, bodyPreview)
 					}
+					matches = append(matches, buildMatchDetails("request", reqText, queryLower, contextLines)...)
 				}
 			}
 		}
@@ -233,6 +245,7 @@ func runSearch(args []string) error {
 						idx := strings.Index(strings.ToLower(respText), queryLower)
 						preview = excerpt(respText, idx, bodyPreview)
 					}
+					matches = append(matches, buildMatchDetails("response", respText, queryLower, contextLines)...)
 				}
 			}
 		}
@@ -247,6 +260,7 @@ func runSearch(args []string) error {
 				MetaLines:     metaLineHits,
 				RequestLines:  requestLineHits,
 				ResponseLines: responseLineHits,
+				Matches:       matches,
 			})
 		}
 	}
@@ -281,6 +295,12 @@ func runSearch(args []string) error {
 		}
 		if r.Preview != "" {
 			fmt.Printf("preview=%s\n", r.Preview)
+		}
+		for _, m := range r.Matches {
+			fmt.Printf("match source=%s line=%d text=%s\n", m.Source, m.Line, m.Text)
+			for _, ctx := range m.Context {
+				fmt.Printf("context %s\n", ctx)
+			}
 		}
 		fmt.Println()
 	}
@@ -325,8 +345,9 @@ func parseNormalizeInputs(args []string) (input string, outDir string, err error
 	return
 }
 
-func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, scopes map[string]bool, err error) {
+func parseSearchInputs(args []string) (bundleDir string, query string, bodyPreview int, beforeID int, afterID int, scopes map[string]bool, contextLines int, err error) {
 	bodyPreview = 160
+	contextLines = 0
 	scopeValue := ""
 	remaining := make([]string, 0, len(args))
 
@@ -348,6 +369,29 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 			bodyPreview, err = strconv.Atoi(strings.TrimPrefix(arg, "--body-preview="))
 			if err != nil {
 				err = fmt.Errorf("invalid --body-preview value: %w", err)
+				return
+			}
+		case arg == "-C" || arg == "--context":
+			if i+1 >= len(args) {
+				err = errors.New("--context requires a value")
+				return
+			}
+			contextLines, err = strconv.Atoi(args[i+1])
+			if err != nil {
+				err = fmt.Errorf("invalid --context value: %w", err)
+				return
+			}
+			i++
+		case strings.HasPrefix(arg, "--context="):
+			contextLines, err = strconv.Atoi(strings.TrimPrefix(arg, "--context="))
+			if err != nil {
+				err = fmt.Errorf("invalid --context value: %w", err)
+				return
+			}
+		case strings.HasPrefix(arg, "-C="):
+			contextLines, err = strconv.Atoi(strings.TrimPrefix(arg, "-C="))
+			if err != nil {
+				err = fmt.Errorf("invalid -C value: %w", err)
 				return
 			}
 		case arg == "--before-id":
@@ -399,7 +443,7 @@ func parseSearchInputs(args []string) (bundleDir string, query string, bodyPrevi
 	}
 
 	if len(remaining) < 2 {
-		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N] [--in body|meta|request|response|all]")
+		err = errors.New("usage: saztool search <bundle_dir> <query> [--body-preview N] [--before-id N] [--after-id N] [--in body|meta|request|response|all] [-C N]")
 		return
 	}
 
@@ -449,6 +493,39 @@ func parseSearchScopes(value string) (map[string]bool, error) {
 		return nil, errors.New("--in cannot be empty")
 	}
 	return result, nil
+}
+
+func buildMatchDetails(source, text, query string, contextLines int) []matchDetail {
+	lines := strings.Split(text, "\n")
+	matches := make([]matchDetail, 0)
+	for i, line := range lines {
+		if !strings.Contains(strings.ToLower(line), query) {
+			continue
+		}
+		detail := matchDetail{
+			Source: source,
+			Line:   i + 1,
+			Text:   strings.TrimSpace(line),
+		}
+		if contextLines > 0 {
+			start := i - contextLines
+			if start < 0 {
+				start = 0
+			}
+			end := i + contextLines
+			if end >= len(lines) {
+				end = len(lines) - 1
+			}
+			for j := start; j <= end; j++ {
+				if j == i {
+					continue
+				}
+				detail.Context = append(detail.Context, fmt.Sprintf("line=%d text=%s", j+1, strings.TrimSpace(lines[j])))
+			}
+		}
+		matches = append(matches, detail)
+	}
+	return matches
 }
 
 func readManifest(bundleDir string) (*model.Manifest, error) {

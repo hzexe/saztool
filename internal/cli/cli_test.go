@@ -65,23 +65,23 @@ func TestParseNormalizeInputsBothOrders(t *testing.T) {
 }
 
 func TestParseSearchInputsOptionOrder(t *testing.T) {
-	bundle, query, _, beforeID, afterID, scopes, err := parseSearchInputs([]string{"bundle.norm", "token", "--before-id", "20", "--after-id", "10", "--in", "request"})
+	bundle, query, _, beforeID, afterID, scopes, contextLines, err := parseSearchInputs([]string{"bundle.norm", "token", "--before-id", "20", "--after-id", "10", "--in", "request", "-C", "2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 {
-		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d", bundle, query, beforeID, afterID)
+	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 2 {
+		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d", bundle, query, beforeID, afterID, contextLines)
 	}
 	if !scopes["request"] || scopes["body"] {
 		t.Fatalf("unexpected scopes: %#v", scopes)
 	}
 
-	bundle, query, _, beforeID, afterID, scopes, err = parseSearchInputs([]string{"--in", "response", "--after-id", "10", "bundle.norm", "token", "--before-id", "20"})
+	bundle, query, _, beforeID, afterID, scopes, contextLines, err = parseSearchInputs([]string{"--in", "response", "--after-id", "10", "bundle.norm", "token", "--before-id", "20"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 {
-		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d", bundle, query, beforeID, afterID)
+	if bundle != "bundle.norm" || query != "token" || beforeID != 20 || afterID != 10 || contextLines != 0 {
+		t.Fatalf("unexpected parse result: bundle=%q query=%q before=%d after=%d context=%d", bundle, query, beforeID, afterID, contextLines)
 	}
 	if !scopes["response"] || scopes["meta"] {
 		t.Fatalf("unexpected scopes: %#v", scopes)
