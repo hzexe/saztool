@@ -1,0 +1,6 @@
+bin/
+saztool
+*.norm/
+*.saz.norm/
+*.zip.norm/
+.DS_Store
