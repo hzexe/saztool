@@ -102,9 +102,9 @@ saztool search demo.saz.norm token --output json
 ```
 
 更完整的参数与语义见：
-- `docs/CLI.md`
-- `docs/INTEGRATIONS.md`
-- `docs/OPENCLAW_TEMPLATES.md`
+- [`docs/CLI.md`](./docs/CLI.md)
+- [`docs/INTEGRATIONS.md`](./docs/INTEGRATIONS.md)
+- [`docs/OPENCLAW_TEMPLATES.md`](./docs/OPENCLAW_TEMPLATES.md)
 
 ## 说明
 

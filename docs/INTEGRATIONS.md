@@ -86,8 +86,8 @@ For OpenClaw specifically, a good progression is:
 3. add a thin skill or MCP wrapper once the contract is stable
 
 See also:
-- `docs/CLI.md`
-- `docs/OPENCLAW_TEMPLATES.md`
+- [`CLI.md`](./CLI.md)
+- [`OPENCLAW_TEMPLATES.md`](./OPENCLAW_TEMPLATES.md)
 
 ## 6. Good packaging pattern
 
