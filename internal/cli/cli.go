@@ -49,12 +49,12 @@ func runNormalize(args []string) error {
 
 func runShow(args []string) error {
 	fs := flag.NewFlagSet("show", flag.ContinueOnError)
-	bodyPreview := fs.Int("body-preview", 600, "max preview chars of decoded body")
+	bodyPreview := fs.Int("body-preview", 0, "max preview chars of request/response body; 0 means show full body")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 2 {
-		return errors.New("usage: saztool show <bundle_dir> <session-id> [-body-preview N]")
+		return errors.New("usage: saztool show <bundle_dir> <session-id> [--body-preview N]")
 	}
 
 	bundleDir := filepath.Clean(fs.Arg(0))
@@ -103,15 +103,26 @@ func runShow(args []string) error {
 	if meta.TruncationReason != "" {
 		fmt.Printf("truncationReason: %s\n", meta.TruncationReason)
 	}
+	fmt.Printf("requestPath: %s\n", fallback(meta.RequestPath, "-"))
+	fmt.Printf("responsePath: %s\n", fallback(meta.ResponsePath, "-"))
 	fmt.Printf("sourceRequestPath: %s\n", fallback(meta.SourceRequestPath, "-"))
 	fmt.Printf("sourceResponsePath: %s\n", fallback(meta.SourceResponsePath, "-"))
+	fmt.Printf("decodedBodyPath: %s\n", fallback(meta.DecodedBodyPath, "-"))
 	fmt.Printf("transforms: %s\n", joinOrDash(meta.Transforms))
+
+	requestFile := filepath.Join(bundleDir, filepath.FromSlash(meta.RequestPath))
+	if reqRaw, err := os.ReadFile(requestFile); err == nil {
+		if parsedReq, err := parseRequestForShow(reqRaw); err == nil && parsedReq.BodyIsText {
+			fmt.Println("\n--- request body ---")
+			fmt.Println(truncate(parsedReq.BodyText, *bodyPreview))
+		}
+	}
 
 	if meta.DecodedBodyPath != "" {
 		decodedPath := filepath.Join(bundleDir, filepath.FromSlash(meta.DecodedBodyPath))
 		body, err := os.ReadFile(decodedPath)
 		if err == nil {
-			fmt.Println("\n--- decoded body preview ---")
+			fmt.Println("\n--- response body ---")
 			fmt.Println(truncate(string(body), *bodyPreview))
 		}
 	}
@@ -578,6 +589,46 @@ func buildMatchDetails(source, text, query string, contextLines int) []matchDeta
 	return matches
 }
 
+func parseRequestForShow(raw []byte) (*showParsedBody, error) {
+	sep := []byte("\r\n\r\n")
+	idx := strings.Index(string(raw), string(sep))
+	sepLen := len(sep)
+	if idx < 0 {
+		sep = []byte("\n\n")
+		idx = strings.Index(string(raw), string(sep))
+		sepLen = len(sep)
+	}
+	if idx < 0 {
+		return nil, errors.New("could not split request headers and body")
+	}
+	headers := string(raw[:idx])
+	body := raw[idx+sepLen:]
+	contentType := ""
+	for _, line := range strings.Split(headers, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
+			contentType = strings.TrimSpace(strings.TrimPrefix(line, "Content-Type:"))
+			contentType = strings.TrimSpace(strings.TrimPrefix(contentType, "content-type:"))
+			break
+		}
+	}
+	bodyText := string(body)
+	bodyIsText := true
+	for _, b := range body {
+		if b == 0 {
+			bodyIsText = false
+			break
+		}
+	}
+	_ = contentType
+	return &showParsedBody{BodyText: bodyText, BodyIsText: bodyIsText}, nil
+}
+
+type showParsedBody struct {
+	BodyText   string
+	BodyIsText bool
+}
+
 func readManifest(bundleDir string) (*model.Manifest, error) {
 	path := filepath.Join(bundleDir, "manifest.json")
 	data, err := os.ReadFile(path)
@@ -619,7 +670,10 @@ func joinOrDash(v []string) string {
 
 func truncate(s string, n int) string {
 	s = strings.TrimSpace(s)
-	if n <= 0 || len(s) <= n {
+	if n == 0 || len(s) <= n {
+		return s
+	}
+	if n < 0 {
 		return s
 	}
 	return s[:n] + "..."

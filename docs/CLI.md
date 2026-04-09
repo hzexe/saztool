@@ -47,16 +47,20 @@ Parameters:
   - Fiddler session id to inspect
 - `--body-preview N`
   - optional
-  - default: `600`
-  - max preview characters for decoded textual body
+  - default: `0`
+  - when `0`, show full request/response body
+  - when `N > 0`, truncate body display to N characters
 
 Displays:
 - sessionId / ordinal / timelineOrdinal when available
 - method / url / statusCode
 - contentType / transferEncoding / contentEncoding / charset
+- actual bundle file paths: `requestPath`, `responsePath`, `decodedBodyPath`
+- source archive-internal paths: `sourceRequestPath`, `sourceResponsePath`
 - statusMarkers / decodeFailureReason / truncationReason when present
 - transforms
-- decoded body preview when available
+- request body when textual
+- response body from decoded body file when available
 
 ## `search`
 
